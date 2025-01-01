@@ -41,8 +41,8 @@ def read_data(file):
     return X,y
 
 #X,y = read_data('large.csv')
-#X,y = read_data('small.csv')
-X,y = read_data('very_small.csv')
+X,y = read_data('small.csv')
+#X,y = read_data('very_small.csv')
 
 print(f'Step 3: Create a Dataset Class')
 # ============================================

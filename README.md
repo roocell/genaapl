@@ -11,7 +11,7 @@ pip install transformers
 # make sure you download the CUDA compiled version of pytorch by using this arg
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install pandas scikit-learn
-
+pip install matplotlib
 
 https://www.kaggle.com/datasets/deltatrup/aapl-1-minute-historical-stock-data-2006-2024
 Date,Open,High,Low,Close,Adj Close,Volume
