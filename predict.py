@@ -3,6 +3,7 @@ import torch.nn as nn
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import joblib
+import matplotlib.pyplot as plt
 
 # Define the same StockTransformer model class
 class StockTransformer(torch.nn.Module):
@@ -48,7 +49,7 @@ historical_features = torch.tensor(X.values, dtype=torch.float32).to(device)  # 
 # Predict 10 new "Close" values based on historical data
 predictions = []
 with torch.no_grad():
-    for _ in range(10):  # Generate 10 new predictions
+    for _ in range(30):  # Generate 10 new predictions
         # Add batch dimension for input
         input_features = historical_features.unsqueeze(0)  # Use entire historical sequence
         predicted_close = model(input_features).item()
@@ -65,10 +66,21 @@ with torch.no_grad():
         historical_features = torch.cat([historical_features, new_row], dim=0)  # Append to historical features
 
 # Print the predictions
-print("Next 10 predicted 'Close' values:")
+print("Next predicted 'Close' values:")
 print(predictions)
 
-# Optionally, append predictions to the DataFrame and save to a new CSV
-new_data = pd.DataFrame({'Close': predictions})
-new_data.to_csv('predicted_data.csv', index=False)
-print("Predictions saved to 'predicted_data.csv'")
+
+# Combine original and predicted data
+original_close = scaler.inverse_transform(data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']])[:, 3]  # Extract original 'Close'
+combined_close = list(original_close) + predictions  # Append predicted values
+
+# Plot the data
+plt.figure(figsize=(12, 6))
+plt.plot(range(len(original_close)), original_close, label='Original Close', color='blue')
+plt.plot(range(len(original_close), len(combined_close)), predictions, label='Predicted Close', color='orange', linestyle='--')
+plt.title('Original and Predicted Close Prices')
+plt.xlabel('Time')
+plt.ylabel('Close Price')
+plt.legend()
+plt.grid(True)
+plt.savefig('plot.png')
