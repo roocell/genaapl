@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
+import joblib
 
 print(f'Step 1: use the GPU')
 # ===================================
@@ -23,12 +24,6 @@ def read_data(file):
     # Load the CSV file
     data = pd.read_csv(file)
 
-    # Convert date to a feature (if needed)
-    data['Date'] = pd.to_datetime(data['Date'])
-    data['Year'] = data['Date'].dt.year
-    data['Month'] = data['Date'].dt.month
-    data['Day'] = data['Date'].dt.day
-
     # Drop the original 'Date' column if not needed
     data = data.drop('Date', axis=1)
 
@@ -37,13 +32,16 @@ def read_data(file):
     scaled_data = scaler.fit_transform(data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']])
     data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']] = scaled_data
 
-    # Optionally split into features and targets
-    X = data.drop('Open', axis=1)  # Features
+    # Save the scaler
+    joblib.dump(scaler, 'scaler.pkl')
+
+    # split into features and targets
+    X = data[['Open', 'High', 'Low', 'Adj Close', 'Volume']] # features
     y = data['Close']  # Target
     return X,y
 
-# X,y = read_data('large.csv')
-# X,y = read_data('small.csv')
+#X,y = read_data('large.csv')
+#X,y = read_data('small.csv')
 X,y = read_data('very_small.csv')
 
 print(f'Step 3: Create a Dataset Class')
@@ -72,7 +70,7 @@ class StockTransformer(nn.Module):
         self.input_layer = nn.Linear(input_size, hidden_size)
         self.transformer = nn.Transformer(
             d_model=hidden_size,
-            nhead=4,
+            nhead=2,
             num_encoder_layers=num_layers,
             num_decoder_layers=num_layers,
             batch_first=True,
@@ -94,6 +92,7 @@ class StockTransformer(nn.Module):
 print(f'input_size={X.shape[1]}')
 model = StockTransformer(input_size=X.shape[1], hidden_size=128, num_layers=2).to(device)
 print(next(model.parameters()).device)  # Should print 'cuda:0'
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
 print(f'Step 5: Train the Model')
 # =============================
@@ -168,7 +167,8 @@ with torch.no_grad():
 print(f"Test Loss: {test_loss:.4f}")
 
 
-
+print(f"Features shape: {features.shape}, Targets shape: {targets.shape}")
+print(f"Sample feature: {features[0]}, Target: {targets[0]}")
 
 print(f'Step 7: Save the Model')
 # ====================================

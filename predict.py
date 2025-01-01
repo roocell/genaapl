@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+import joblib
 
 # Define the same StockTransformer model class
 class StockTransformer(torch.nn.Module):
@@ -24,46 +25,56 @@ class StockTransformer(torch.nn.Module):
 
 # Load the model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = StockTransformer(input_size=8, hidden_size=128, num_layers=2)  # Match input_size to training
+model = StockTransformer(input_size=5, hidden_size=128, num_layers=2)  # Match input_size to training
 model.load_state_dict(torch.load('stock_transformer_model.pth', weights_only=True))
 model.to(device)
-model.eval()
+model.eval() # always put into eval when doing inference (using the model)
 
 # Load and preprocess the data
 data = pd.read_csv('test_data.csv')
-data['Date'] = pd.to_datetime(data['Date'])
-data['Year'] = data['Date'].dt.year
-data['Month'] = data['Date'].dt.month
-data['Day'] = data['Date'].dt.day
 data = data.drop('Date', axis=1)
 
 # Normalize the data
-scaler = MinMaxScaler()
-scaled_data = scaler.fit_transform(data[['High', 'Low', 'Close', 'Adj Close', 'Volume', 'Year', 'Month', 'Day']])
-data[['High', 'Low', 'Close', 'Adj Close', 'Volume', 'Year', 'Month', 'Day']] = scaled_data
+#scaler = MinMaxScaler()
+scaler = joblib.load('scaler.pkl') # use saved scaler
+
+scaled_data = scaler.fit_transform(data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']])
+data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']] = scaled_data
 
 # Prepare the most recent data as the input
-X = data[['High', 'Low', 'Close', 'Adj Close', 'Volume', 'Year', 'Month', 'Day']]  # Match training features
+X = data[['Open', 'High', 'Low', 'Adj Close', 'Volume']]  # Match training features
 last_features = torch.tensor(X.values[-1], dtype=torch.float32).to(device)  # Last row as input
 
-# Predict the next 10 "Open" values
+
+print(f'{data}')
+
+# Predict the next 10 "Close" values
 predictions = []
 with torch.no_grad():
     for _ in range(10):
         # Add batch dimension
         input_features = last_features.unsqueeze(0)
-        predicted_open = model(input_features).item()
-        predictions.append(predicted_open)
+        predicted_close = model(input_features).item()
+
+        # Prepare data for inverse transformation
+        # Insert the predicted value into the correct position based on the scaler's expected feature order
+        input_for_inverse = [[0, 0, 0, predicted_close, 0, 0]]  # Example for ['Open', 'High', 'Low', 'Adj Close', 'Volume']
+        
+        # Perform inverse transformation
+        original_scale_value = scaler.inverse_transform(input_for_inverse)[0, 3]  # Extract the 'Close' column
+        
+        # Print the inverse-transformed value
+        print(f'Inverse-transformed predicted close: {original_scale_value}')
+
+        predictions.append(original_scale_value)
+
+        # topk?
 
         # Simulate updating the last_features with predicted value
-        new_row = torch.tensor([predicted_open] + last_features.tolist()[1:], dtype=torch.float32).to(device)
+        new_row = torch.tensor(last_features.tolist()[:3] + [predicted_close] + last_features.tolist()[4:], dtype=torch.float32).to(device)
         last_features = new_row
 
-# Convert predictions back to original scale
-predicted_open_values = scaler.inverse_transform(
-    [[0, 0, 0, 0, 0, 0, 0, p] for p in predictions]
-)[:, -1]
 
 # Print the results
 print("Next 10 predicted 'Open' values:")
-print(predicted_open_values)
+print(predictions)
